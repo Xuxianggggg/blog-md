@@ -38,25 +38,22 @@ def main(md_path, status):
     base_dir = os.path.dirname(md_path)
     md = open(md_path, "r", encoding="utf-8").read()
 
-    # Title: first non-empty line (simple + works for your current file)
-    title = next((ln.strip() for ln in md.splitlines() if ln.strip()), os.path.basename(md_path))
-
+    # Title = first non-empty line
+    lines = md.splitlines()
+    title = next((ln.strip() for ln in lines if ln.strip()), os.path.basename(md_path))
+    
+    # Remove the title line from body once
+    title_removed = False
+    body_lines = []
+    for ln in lines:
+        if not title_removed and ln.strip():
+            title_removed = True
+            continue
+        body_lines.append(ln)
+    body_md = "\n".join(body_lines).lstrip()
+    
     # Upload local images and replace links
-    def repl(m):
-        alt = m.group(1)
-        link = m.group(2).strip()
-        if link.startswith("http://") or link.startswith("https://"):
-            return m.group(0)
-
-        local_path = os.path.normpath(os.path.join(base_dir, link))
-        if not os.path.isfile(local_path):
-            # leave as-is if not found
-            return m.group(0)
-
-        url = upload_media(wp_url, auth, local_path)
-        return f"![{alt}]({url})"
-
-    md2 = IMG_RE.sub(repl, md)
+    md2 = IMG_RE.sub(repl, body_md)
 
     # Convert to HTML for WordPress
     html = markdown(md2, extensions=["extra", "tables", "fenced_code"])
