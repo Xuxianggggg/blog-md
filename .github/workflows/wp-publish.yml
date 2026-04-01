@@ -11,9 +11,12 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -25,10 +28,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyyaml markdown
 
-      - name: Publish test post
+      - name: Find changed markdown
+        id: changed_md
+        run: |
+          MD_PATH=$(git diff --name-only HEAD^ HEAD | grep '^posts/.*\.md$' | head -n 1 || true)
+          echo "md_path=$MD_PATH" >> $GITHUB_OUTPUT
+          echo "Changed markdown: $MD_PATH"
+
+      - name: Publish changed post
+        if: steps.changed_md.outputs.md_path != ''
         env:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASS: ${{ secrets.WP_APP_PASS }}
         run: |
-          python tools/wp_publish.py posts/2026-04-01-my-first-test/2026-04-01-my-first-test.md --status publish
+          python tools/wp_publish.py "${{ steps.changed_md.outputs.md_path }}" --status publish
