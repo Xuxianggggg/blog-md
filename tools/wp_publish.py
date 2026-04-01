@@ -65,7 +65,7 @@ def main(md_path, status):
         md = f.read()
 
     lines = md.splitlines()
-    title = next((ln.strip() for ln in lines if ln.strip()), os.path.basename(md_path))
+    title = next((ln.strip().lstrip("#").strip() for ln in lines if ln.strip()), os.path.basename(md_path))
 
     # 去掉第一行标题，避免正文重复显示标题
     title_removed = False
