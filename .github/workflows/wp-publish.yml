@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,25 +26,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyyaml markdown
 
-      - name: Find changed markdown files
-        id: changed_md
-        run: |
-          git diff --name-only HEAD^ HEAD | grep '^posts/.*\.md$' > changed_md.txt || true
-          echo "Changed markdown files:"
-          cat changed_md.txt || true
-
-      - name: Publish all changed posts
+      - name: Publish all markdown files
         env:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASS: ${{ secrets.WP_APP_PASS }}
         run: |
-          if [ ! -s changed_md.txt ]; then
-            echo "No changed markdown files found."
-            exit 0
-          fi
+          find posts -type f -name "*.md" | sort > all_md.txt
+
+          echo "All markdown files:"
+          cat all_md.txt
 
           while IFS= read -r md_file; do
             echo "Publishing: $md_file"
             python tools/wp_publish.py "$md_file" --status publish
-          done < changed_md.txt
+          done < all_md.txt
