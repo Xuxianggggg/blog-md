@@ -31,4 +31,4 @@ jobs:
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASS: ${{ secrets.WP_APP_PASS }}
         run: |
-          python tools/wp_publish.py posts/2026-04-01-my-first-test/2026-04-01-my-first-test.md --status draft
+          python tools/wp_publish.py posts/2026-04-01-my-first-test/2026-04-01-my-first-test.md --status publish
