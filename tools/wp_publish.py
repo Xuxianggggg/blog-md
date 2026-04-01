@@ -32,17 +32,18 @@ def upload_media(wp_url, auth, file_path):
 def main(md_path, status):
     wp_url = env("WP_URL").rstrip("/")
     wp_user = env("WP_USER")
-    wp_app_pass = env("WP_APP_PASS").replace(" ", "")  # remove spaces if any
+    wp_app_pass = env("WP_APP_PASS").replace(" ", "")
     auth = (wp_user, wp_app_pass)
 
     base_dir = os.path.dirname(md_path)
-    md = open(md_path, "r", encoding="utf-8").read()
+    with open(md_path, "r", encoding="utf-8") as f:
+        md = f.read()
 
-    # Title = first non-empty line
+    # 第一行非空内容作为标题
     lines = md.splitlines()
     title = next((ln.strip() for ln in lines if ln.strip()), os.path.basename(md_path))
-    
-    # Remove the title line from body once
+
+    # 正文去掉第一行标题
     title_removed = False
     body_lines = []
     for ln in lines:
@@ -51,20 +52,46 @@ def main(md_path, status):
             continue
         body_lines.append(ln)
     body_md = "\n".join(body_lines).lstrip()
-    
-    # Upload local images and replace links
+
+    # 处理 Markdown 里的本地图片
+    def repl(match):
+        alt_text = match.group(1)
+        img_path = match.group(2).strip()
+
+        # 远程图片直接保留
+        if img_path.startswith("http://") or img_path.startswith("https://"):
+            return match.group(0)
+
+        abs_path = os.path.normpath(os.path.join(base_dir, img_path))
+        if not os.path.exists(abs_path):
+            print(f"Warning: image not found: {abs_path}")
+            return match.group(0)
+
+        try:
+            media_url = upload_media(wp_url, auth, abs_path)
+            return f"![{alt_text}]({media_url})"
+        except Exception as e:
+            print(f"Warning: failed to upload image {abs_path}: {e}")
+            return match.group(0)
+
     md2 = IMG_RE.sub(repl, body_md)
 
-    # Convert to HTML for WordPress
+    # Markdown 转 HTML
     html = markdown(md2, extensions=["extra", "tables", "fenced_code"])
 
-    # Create post
+    # 创建文章
     payload = {
         "title": title,
         "content": html,
-        "status": status,   # "draft" or "publish"
+        "status": status,
     }
-    r = requests.post(f"{wp_url}/wp-json/wp/v2/posts", auth=auth, json=payload, timeout=60)
+
+    r = requests.post(
+        f"{wp_url}/wp-json/wp/v2/posts",
+        auth=auth,
+        json=payload,
+        timeout=60,
+    )
     r.raise_for_status()
     j = r.json()
     print("Created:", j.get("link"))
