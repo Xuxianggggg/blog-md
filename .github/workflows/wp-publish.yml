@@ -28,18 +28,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyyaml markdown
 
-      - name: Find changed markdown
+      - name: Find changed markdown files
         id: changed_md
         run: |
-          MD_PATH=$(git diff --name-only HEAD^ HEAD | grep '^posts/.*\.md$' | head -n 1 || true)
-          echo "md_path=$MD_PATH" >> $GITHUB_OUTPUT
-          echo "Changed markdown: $MD_PATH"
+          git diff --name-only HEAD^ HEAD | grep '^posts/.*\.md$' > changed_md.txt || true
+          echo "Changed markdown files:"
+          cat changed_md.txt || true
 
-      - name: Publish changed post
-        if: steps.changed_md.outputs.md_path != ''
+      - name: Publish all changed posts
         env:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
           WP_APP_PASS: ${{ secrets.WP_APP_PASS }}
         run: |
-          python tools/wp_publish.py "${{ steps.changed_md.outputs.md_path }}" --status publish
+          if [ ! -s changed_md.txt ]; then
+            echo "No changed markdown files found."
+            exit 0
+          fi
+
+          while IFS= read -r md_file; do
+            echo "Publishing: $md_file"
+            python tools/wp_publish.py "$md_file" --status publish
+          done < changed_md.txt
