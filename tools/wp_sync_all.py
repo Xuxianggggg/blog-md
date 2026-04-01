@@ -161,7 +161,7 @@ def list_managed_posts(wp_url, auth, managed_tag_id: int):
 
 
 def delete_post(wp_url, auth, post_id: int, force: bool = False):
-    # force=False -> 进回收站；force=True -> 永久删除
+    # force=False -> 进回收站；force=True -> 永久删除，但愿吧
     r = requests.delete(
         f"{wp_url}/wp-json/wp/v2/posts/{post_id}",
         auth=auth,
