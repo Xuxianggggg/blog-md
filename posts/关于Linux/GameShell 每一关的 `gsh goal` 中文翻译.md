@@ -2,6 +2,7 @@
 
 说明：这份文件按 GameShell 默认任务顺序整理，依据仓库当前 `missions/default.idx` 和各子目录中的 `goal/en.txt` 翻译而成。共享目录（如 `!00_shared`）不是单独关卡，所以未单列。  
 版本来源：`phyver/GameShell` 仓库当前 `master` 分支。
+- `gsh goto 18`：移动到第18关。密码: `gsh`。  
 
 ---
 
