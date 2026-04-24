@@ -193,11 +193,9 @@ def render_markdown(md_path: str, wp_url: str, auth):
 
     lines = md.splitlines()
 
-    # 第一行非空内容作为标题；支持 "# 标题"
-    title = next(
-        (ln.strip().lstrip("#").strip() for ln in lines if ln.strip()),
-        os.path.basename(md_path),
-    )
+    # 文章标题统一使用 GitHub 中的 Markdown 文件名（去掉 .md 后缀）。
+    # 这样首页/侧边栏文章列表会和 posts/** 下的 md 文件名保持一致。
+    title = os.path.splitext(os.path.basename(md_path))[0]
 
     # 正文去掉第一行标题，避免正文重复显示标题
     title_removed = False
