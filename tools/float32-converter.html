@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IEEE 754 单精度浮点数转换器</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #172033;
+      --muted: #657086;
+      --border: #dfe4ee;
+      --blue: #3b82f6;
+      --blue-dark: #1d4ed8;
+      --green: #16a34a;
+      --orange: #f97316;
+      --purple: #7c3aed;
+      --red: #dc2626;
+      --shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 36rem),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 34rem),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 18px 56px;
+    }
+
+    header {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 4vw, 46px);
+      letter-spacing: -0.04em;
+    }
+
+    header p {
+      margin: 0 auto;
+      max-width: 800px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(223, 228, 238, 0.9);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .sticky {
+      position: sticky;
+      top: 18px;
+    }
+
+    @media (max-width: 920px) {
+      .sticky {
+        position: static;
+      }
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-size: 16px;
+      background: #fff;
+      outline: none;
+      transition: border 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 11px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #e9eef8;
+      color: #172033;
+      transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .primary:hover {
+      background: var(--blue-dark);
+    }
+
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .chip {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #edf2ff;
+      color: #1e3a8a;
+      border: 1px solid #dbe7ff;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 720px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mini-card {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 18px;
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .mini-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 5px;
+    }
+
+    .mini-value {
+      font-family: var(--mono);
+      font-size: 16px;
+      word-break: break-all;
+    }
+
+    .bits-wrap {
+      margin: 12px 0 16px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .bits {
+      display: grid;
+      grid-template-columns: 34px repeat(8, 26px) repeat(23, 26px);
+      gap: 4px;
+      min-width: 930px;
+      align-items: center;
+    }
+
+    .bit {
+      height: 34px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-weight: 800;
+      font-size: 14px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .sign { background: #dbeafe; color: #1d4ed8; }
+    .exponent { background: #dcfce7; color: #166534; }
+    .fraction { background: #ffedd5; color: #9a3412; }
+
+    .bit-labels {
+      display: grid;
+      grid-template-columns: 34px 236px 686px;
+      gap: 4px;
+      min-width: 930px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 8px 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .section-title {
+      margin: 24px 0 12px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 18px;
+      padding: 14px 16px;
+    }
+
+    .step h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .step p {
+      margin: 6px 0;
+    }
+
+    code, .mono {
+      font-family: var(--mono);
+      background: #f3f6fb;
+      border: 1px solid #e4e9f2;
+      border-radius: 8px;
+      padding: 1px 6px;
+      word-break: break-all;
+    }
+
+    .formula {
+      display: block;
+      margin: 8px 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: var(--mono);
+      overflow-x: auto;
+    }
+
+    .warn {
+      border-left: 5px solid var(--orange);
+      padding: 10px 12px;
+      background: #fff7ed;
+      border-radius: 12px;
+      color: #7c2d12;
+      margin-top: 12px;
+    }
+
+    .ok {
+      border-left: 5px solid var(--green);
+      padding: 10px 12px;
+      background: #f0fdf4;
+      border-radius: 12px;
+      color: #14532d;
+      margin-top: 12px;
+    }
+
+    .error {
+      color: var(--red);
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      background: #fff;
+      margin-top: 12px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f8fafc;
+      font-size: 13px;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>IEEE 754 单精度浮点数转换器</h1>
+      <p>输入一个十进制数，查看它在 32 位 float 中的 sign、exponent、fraction，以及规格数、非规格数、Infinity、NaN 的判断过程。</p>
+    </header>
+
+    <section class="layout">
+      <aside class="card sticky">
+        <div class="field">
+          <label for="numberInput">输入十进制数</label>
+          <input id="numberInput" value="8.6875" autocomplete="off" spellcheck="false" />
+          <div class="hint">支持：<code>8.6875</code>、<code>-0.1</code>、<code>1e-40</code>、<code>2^-127</code>、<code>Infinity</code>、<code>NaN</code></div>
+        </div>
+
+        <div class="button-row">
+          <button class="primary" id="convertBtn">转换</button>
+          <button id="clearBtn">清空</button>
+        </div>
+
+        <label>快速例子</label>
+        <div class="examples">
+          <span class="chip" data-value="8.6875">8.6875 正常数</span>
+          <span class="chip" data-value="2^-127">2^-127 非规格数</span>
+          <span class="chip" data-value="2^-149">2^-149 最小正非规格数</span>
+          <span class="chip" data-value="16777217">16777217 精度丢失</span>
+          <span class="chip" data-value="0.1">0.1 舍入</span>
+          <span class="chip" data-value="Infinity">Infinity</span>
+          <span class="chip" data-value="NaN">NaN</span>
+        </div>
+
+        <div class="footer-note">
+          法语关键词：规格数 = <b>nombre normalisé</b>；非规格数 = <b>nombre sous-normal</b>；尾数 = <b>mantisse / fraction</b>；指数 = <b>exposant</b>。
+        </div>
+      </aside>
+
+      <section class="card">
+        <div id="error" class="error"></div>
+
+        <div class="summary-grid" id="summary"></div>
+
+        <h2 class="section-title">32 位结构</h2>
+        <div class="legend">
+          <span><i class="dot sign"></i>sign 符号位 / bit de signe</span>
+          <span><i class="dot exponent"></i>exponent 指数位 / exposant</span>
+          <span><i class="dot fraction"></i>fraction 尾数位 / mantisse</span>
+        </div>
+        <div class="bits-wrap">
+          <div class="bits" id="bits"></div>
+          <div class="bit-labels">
+            <div>1 bit</div>
+            <div>8 bit</div>
+            <div>23 bit</div>
+          </div>
+        </div>
+
+        <h2 class="section-title">转换过程</h2>
+        <div class="steps" id="steps"></div>
+
+        <h2 class="section-title">术语对照</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>中文</th>
+              <th>Français</th>
+              <th>English</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>单精度浮点数</td><td>nombre flottant simple précision</td><td>single-precision floating-point number</td></tr>
+            <tr><td>符号位</td><td>bit de signe</td><td>sign bit</td></tr>
+            <tr><td>指数位</td><td>exposant</td><td>exponent</td></tr>
+            <tr><td>尾数位</td><td>mantisse / fraction</td><td>mantissa / fraction</td></tr>
+            <tr><td>规格数</td><td>nombre normalisé</td><td>normal number</td></tr>
+            <tr><td>非规格数</td><td>nombre sous-normal / dénormalisé</td><td>subnormal number</td></tr>
+            <tr><td>偏移量</td><td>biais</td><td>bias</td></tr>
+            <tr><td>舍入</td><td>arrondi</td><td>rounding</td></tr>
+            <tr><td>精度丢失</td><td>perte de précision</td><td>loss of precision</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const input = document.getElementById('numberInput');
+    const convertBtn = document.getElementById('convertBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const bitsEl = document.getElementById('bits');
+    const stepsEl = document.getElementById('steps');
+    const summaryEl = document.getElementById('summary');
+    const errorEl = document.getElementById('error');
+
+    const buffer = new ArrayBuffer(4);
+    const view = new DataView(buffer);
+
+    function parseUserNumber(raw) {
+      const s = raw.trim();
+      if (!s) throw new Error('请输入一个数字。');
+
+      if (/^[+-]?nan$/i.test(s)) return NaN;
+      if (/^\+?inf(inity)?$/i.test(s)) return Infinity;
+      if (/^-inf(inity)?$/i.test(s)) return -Infinity;
+
+      const powerMatch = s.match(/^([+-]?)2\s*\^\s*([+-]?\d+)$/i);
+      if (powerMatch) {
+        const sign = powerMatch[1] === '-' ? -1 : 1;
+        const exponent = Number(powerMatch[2]);
+        return sign * Math.pow(2, exponent);
+      }
+
+      const n = Number(s);
+      if (Number.isNaN(n)) throw new Error('无法解析这个输入。请尝试 8.6875、1e-40、2^-127、Infinity 或 NaN。');
+      return n;
+    }
+
+    function float32ToBits(n) {
+      view.setFloat32(0, n, false);
+      const u = view.getUint32(0, false);
+      const sign = (u >>> 31) & 1;
+      const exponent = (u >>> 23) & 0xff;
+      const fraction = u & 0x7fffff;
+      const bin = u.toString(2).padStart(32, '0');
+      const hex = u.toString(16).padStart(8, '0').toUpperCase();
+      return { u, sign, exponent, fraction, bin, hex };
+    }
+
+    function bitsToGroupedBinary(bin) {
+      return `${bin.slice(0, 1)} ${bin.slice(1, 9)} ${bin.slice(9)}`;
+    }
+
+    function bin8(n) {
+      return n.toString(2).padStart(8, '0');
+    }
+
+    function bin23(n) {
+      return n.toString(2).padStart(23, '0');
+    }
+
+    function formatNumber(n) {
+      if (Number.isNaN(n)) return 'NaN';
+      if (Object.is(n, -0)) return '-0';
+      if (!Number.isFinite(n)) return n > 0 ? 'Infinity' : '-Infinity';
+      return String(n);
+    }
+
+    function formatPrecise(n) {
+      if (Number.isNaN(n) || !Number.isFinite(n)) return formatNumber(n);
+      if (Object.is(n, -0)) return '-0';
+      return n.toPrecision(17).replace(/\.0+$/, '');
+    }
+
+    function classify(parts) {
+      const { exponent, fraction } = parts;
+      if (exponent === 0 && fraction === 0) return 'zero';
+      if (exponent === 0) return 'subnormal';
+      if (exponent === 255 && fraction === 0) return 'infinity';
+      if (exponent === 255 && fraction !== 0) return 'nan';
+      return 'normal';
+    }
+
+    function classLabel(c) {
+      return {
+        normal: '规格数 / nombre normalisé / normal number',
+        subnormal: '非规格数 / nombre sous-normal / subnormal number',
+        zero: '零 / zéro / zero',
+        infinity: '无穷 / infini / infinity',
+        nan: '非数 / pas un nombre / NaN'
+      }[c];
+    }
+
+    function makeBitCells(bin) {
+      bitsEl.innerHTML = '';
+      bin.split('').forEach((b, i) => {
+        const div = document.createElement('div');
+        div.className = 'bit ' + (i === 0 ? 'sign' : i < 9 ? 'exponent' : 'fraction');
+        div.textContent = b;
+        div.title = `bit ${31 - i}`;
+        bitsEl.appendChild(div);
+      });
+    }
+
+    function mini(title, value) {
+      return `<div class="mini-card"><div class="mini-title">${title}</div><div class="mini-value">${value}</div></div>`;
+    }
+
+    function step(title, body) {
+      return `<article class="step"><h3>${title}</h3>${body}</article>`;
+    }
+
+    function toBinaryFinitePositive(value, maxFracBits = 80) {
+      if (value === 0) return '0';
+      const intPart = Math.floor(value);
+      let frac = value - intPart;
+      let intBin = intPart.toString(2);
+      if (intPart === 0) intBin = '0';
+      let fracBin = '';
+      let count = 0;
+      while (frac !== 0 && count < maxFracBits) {
+        frac *= 2;
+        if (frac >= 1) {
+          fracBin += '1';
+          frac -= 1;
+        } else {
+          fracBin += '0';
+        }
+        count++;
+      }
+      return fracBin ? `${intBin}.${fracBin}${frac !== 0 ? '...' : ''}` : intBin;
+    }
+
+    function explainNormal(original, rounded, parts) {
+      const realExponent = parts.exponent - 127;
+      const fractionBits = bin23(parts.fraction);
+      const significandBits = `1.${fractionBits}`;
+      const signText = parts.sign === 0 ? '正数，所以 sign = 0。' : '负数，所以 sign = 1。';
+      const absRounded = Math.abs(rounded);
+      const approxBin = Number.isFinite(absRounded) ? toBinaryFinitePositive(absRounded) : '';
+
+      return [
+        step('1. 符号位 sign / bit de signe', `<p>${signText}</p>`),
+        step('2. 转成二进制并规格化 / normalisation', `
+          <p>这个数属于<strong>规格数</strong>，因为 exponent 不是全 0，也不是全 1。</p>
+          <p>十进制输入被 float32 舍入后的值是：<code>${formatPrecise(rounded)}</code></p>
+          <p>它的二进制大致是：<code>${approxBin}</code></p>
+          <span class="formula">规格数形式：(-1)^sign × 1.fraction × 2^(exponent - 127)</span>
+          <p>真实指数 E = <code>${parts.exponent} - 127 = ${realExponent}</code></p>
+        `),
+        step('3. 指数位 exponent / exposant', `
+          <p>存储指数 = 真实指数 + 偏移量 bias。</p>
+          <p><code>${realExponent} + 127 = ${parts.exponent}</code></p>
+          <p>所以 exponent = <code>${bin8(parts.exponent)}</code></p>
+        `),
+        step('4. 尾数位 fraction / mantisse', `
+          <p>规格数默认隐藏最前面的 <code>1.</code>，也就是 <strong>bit implicite / hidden bit</strong>。</p>
+          <p>实际有效数字是：<code>${significandBits}</code></p>
+          <p>存入 fraction 的 23 位是：<code>${fractionBits}</code></p>
+        `),
+        step('5. 最终 32 位结果', `
+          <p class="formula">${bitsToGroupedBinary(parts.bin)}</p>
+          <p>十六进制：<code>0x${parts.hex}</code></p>
+        `)
+      ].join('');
+    }
+
+    function explainSubnormal(original, rounded, parts) {
+      const fractionBits = bin23(parts.fraction);
+      const signText = parts.sign === 0 ? '正数，所以 sign = 0。' : '负数，所以 sign = 1。';
+      const absRounded = Math.abs(rounded);
+      const approxBin = Number.isFinite(absRounded) ? toBinaryFinitePositive(absRounded, 160) : '';
+      const fractionValue = parts.fraction / Math.pow(2, 23);
+
+      return [
+        step('1. 符号位 sign / bit de signe', `<p>${signText}</p>`),
+        step('2. 为什么是非规格数？', `
+          <p>单精度<strong>规格数</strong>的最小真实指数是 <code>-126</code>。</p>
+          <p>如果一个正数比 <code>1.0 × 2^-126</code> 还小，但又没有小到变成 0，它就会进入<strong>非规格数</strong>。</p>
+          <p>当前 float32 值是：<code>${formatPrecise(rounded)}</code></p>
+          <p>它的二进制大致是：<code>${approxBin}</code></p>
+          <div class="ok">非规格数的作用：填补 0 和最小规格数之间的空隙，这叫逐渐下溢 / sous-dépassement graduel / gradual underflow。</div>
+        `),
+        step('3. 指数位 exponent / exposant', `
+          <p>非规格数的 exponent 固定为全 0：</p>
+          <p><code>00000000</code></p>
+          <p>注意：它不是使用 <code>1.fraction × 2^-127</code>，而是使用固定指数 <code>-126</code>。</p>
+        `),
+        step('4. 尾数位 fraction / mantisse', `
+          <p>非规格数不隐藏 <code>1.</code>，而是隐藏 <code>0.</code>。</p>
+          <span class="formula">非规格数形式：(-1)^sign × 0.fraction × 2^-126</span>
+          <p>fraction = <code>${fractionBits}</code></p>
+          <p>也就是 <code>0.${fractionBits}₂ × 2^-126</code></p>
+          <p>fraction 对应的小数值约为：<code>${fractionValue}</code></p>
+        `),
+        step('5. 最终 32 位结果', `
+          <p class="formula">${bitsToGroupedBinary(parts.bin)}</p>
+          <p>十六进制：<code>0x${parts.hex}</code></p>
+        `)
+      ].join('');
+    }
+
+    function explainZero(original, rounded, parts) {
+      const signName = parts.sign === 1 ? '负零 -0' : '正零 +0';
+      return [
+        step('1. 这是零 / zéro', `<p>这个值在 float32 中是 <strong>${signName}</strong>。</p>`),
+        step('2. 存储规则', `
+          <p>exponent 全 0，fraction 也全 0。</p>
+          <p>sign 可以是 0 或 1，所以 IEEE 754 中存在 <code>+0</code> 和 <code>-0</code>。</p>
+        `),
+        step('3. 最终 32 位结果', `
+          <p class="formula">${bitsToGroupedBinary(parts.bin)}</p>
+          <p>十六进制：<code>0x${parts.hex}</code></p>
+        `)
+      ].join('');
+    }
+
+    function explainInfinity(original, rounded, parts) {
+      const name = parts.sign === 0 ? '+Infinity 正无穷 / infini positif' : '-Infinity 负无穷 / infini négatif';
+      return [
+        step('1. 这是 Infinity', `<p>当前结果是：<strong>${name}</strong>。</p>`),
+        step('2. 存储规则', `
+          <p>Infinity 的 exponent 全 1，fraction 全 0。</p>
+          <p>exponent = <code>11111111</code></p>
+          <p>fraction = <code>00000000000000000000000</code></p>
+        `),
+        step('3. 最终 32 位结果', `
+          <p class="formula">${bitsToGroupedBinary(parts.bin)}</p>
+          <p>十六进制：<code>0x${parts.hex}</code></p>
+        `)
+      ].join('');
+    }
+
+    function explainNaN(original, rounded, parts) {
+      return [
+        step('1. 这是 NaN', `<p>NaN 表示 Not a Number，也就是<strong>不是一个数 / pas un nombre</strong>。</p>`),
+        step('2. 存储规则', `
+          <p>NaN 的 exponent 全 1，fraction 不全为 0。</p>
+          <p>exponent = <code>11111111</code></p>
+          <p>fraction = <code>${bin23(parts.fraction)}</code></p>
+          <div class="warn">注意：NaN 有很多种 bit pattern。浏览器这里使用的是 JavaScript/DataView 写入 NaN 后得到的一种常见表示。</div>
+        `),
+        step('3. 最终 32 位结果', `
+          <p class="formula">${bitsToGroupedBinary(parts.bin)}</p>
+          <p>十六进制：<code>0x${parts.hex}</code></p>
+        `)
+      ].join('');
+    }
+
+    function convert() {
+      errorEl.textContent = '';
+      try {
+        const original = parseUserNumber(input.value);
+        const rounded = Math.fround(original);
+        const parts = float32ToBits(rounded);
+        const type = classify(parts);
+
+        makeBitCells(parts.bin);
+
+        const roundedText = formatPrecise(rounded);
+        const originalText = formatNumber(original);
+        const roundingWarning = (
+          Number.isFinite(original) && Number.isFinite(rounded) && original !== rounded
+        ) ? `<div class="warn">输入值无法被 float32 精确表示，已经舍入为 <code>${roundedText}</code>。这就是 arrondi / rounding。</div>` : '';
+
+        summaryEl.innerHTML = [
+          mini('输入值', originalText),
+          mini('float32 实际值', roundedText),
+          mini('类型', classLabel(type)),
+          mini('二进制', bitsToGroupedBinary(parts.bin)),
+          mini('十六进制', '0x' + parts.hex),
+          mini('sign / exponent / fraction', `${parts.sign} / ${bin8(parts.exponent)} / ${bin23(parts.fraction)}`)
+        ].join('') + roundingWarning;
+
+        if (type === 'normal') stepsEl.innerHTML = explainNormal(original, rounded, parts);
+        if (type === 'subnormal') stepsEl.innerHTML = explainSubnormal(original, rounded, parts);
+        if (type === 'zero') stepsEl.innerHTML = explainZero(original, rounded, parts);
+        if (type === 'infinity') stepsEl.innerHTML = explainInfinity(original, rounded, parts);
+        if (type === 'nan') stepsEl.innerHTML = explainNaN(original, rounded, parts);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        summaryEl.innerHTML = '';
+        bitsEl.innerHTML = '';
+        stepsEl.innerHTML = '';
+      }
+    }
+
+    convertBtn.addEventListener('click', convert);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') convert();
+    });
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      input.focus();
+    });
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        input.value = chip.dataset.value;
+        convert();
+      });
+    });
+
+    convert();
+  </script>
+</body>
+</html>
